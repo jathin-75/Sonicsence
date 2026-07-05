@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SonicSense AI — Monitoring Console</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== ALERT OVERLAY ===== -->
+  <div id="alert-overlay" class="alert-overlay hidden">
+    <div class="alert-text">⚠ THREAT SIGNATURE DETECTED ⚠</div>
+    <div class="alert-label" id="alert-label"></div>
+  </div>
+
+  <!-- ===== LOGIN / REGISTER SCREEN ===== -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card panel">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div>
+          <h1 class="logo">SONICSENSE<span>AI</span></h1>
+          <p class="tagline">Environmental Sound Monitoring Matrix v1.4.2</p>
+        </div>
+      </div>
+
+      <div class="auth-tabs">
+        <button id="tab-login" class="tab active">Login</button>
+        <button id="tab-register" class="tab">Register</button>
+      </div>
+
+      <form id="auth-form">
+        <input type="email" id="email" placeholder="Email" required />
+        <div class="password-wrapper">
+          <input type="password" id="password" placeholder="Password" required />
+          <button type="button" id="toggle-password" class="toggle-password">SHOW</button>
+        </div>
+        <button type="submit" id="auth-submit" class="primary-btn">Login</button>
+      </form>
+      <p id="auth-error" class="auth-error"></p>
+    </div>
+  </div>
+
+  <!-- ===== MAIN DASHBOARD ===== -->
+  <div id="dashboard" class="dashboard hidden">
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div>
+          <h1 class="logo small">SONICSENSE<span>AI</span></h1>
+          <p class="tagline">Environmental Sound Monitoring Matrix v1.4.2</p>
+        </div>
+      </div>
+
+      <div class="topbar-controls">
+        <label id="upload-btn" class="outline-btn cyan">
+          Inject Audio File
+          <input type="file" id="file-input" accept="audio/*" hidden />
+        </label>
+        <button id="mic-btn" class="outline-btn magenta">Initialize Pipeline</button>
+      </div>
+
+      <div class="topbar-right">
+        <span id="user-email" class="user-email"></span>
+        <button id="logout-btn" class="ghost-btn">Logout</button>
+      </div>
+    </header>
+
+    <!-- Stat strip -->
+     <!-- Latest Result Banner -->
+<section id="result-banner" class="result-banner hidden">
+  <div class="result-top">
+    <div class="result-icon" id="result-icon">🔊</div>
+    <div class="result-info">
+      <div class="result-tag">Top Detection</div>
+      <div class="result-label" id="result-label">—</div>
+    </div>
+    <div class="result-confidence" id="result-confidence">0%</div>
+  </div>
+  <audio id="result-audio" controls></audio>
+</section>
+</section>
+    <section class="stat-strip">
+      <div class="stat-card panel">
+        <div class="stat-label">Events Processed</div>
+        <div class="stat-value" id="stat-total">0</div>
+      </div>
+      <div class="stat-card panel">
+        <div class="stat-label">Mean Confidence Score</div>
+        <div class="stat-value" id="stat-avg">0%</div>
+      </div>
+      <div class="stat-card panel">
+        <div class="stat-label">Threat Alerts</div>
+        <div class="stat-value alert-color" id="stat-alerts">0</div>
+      </div>
+      <div class="stat-card panel">
+        <div class="stat-label">Matrix Uptime</div>
+        <div class="stat-value" id="stat-uptime">00:00:00</div>
+      </div>
+    </section>
+
+    <main class="grid">
+
+      <!-- Waveform -->
+      <section class="panel waveform-panel">
+        <div class="panel-header">
+          <h2>Acoustic Wave Spectrogram &amp; Real-Time Amplitude Matrix</h2>
+          <span class="panel-tag">Stream Active // 44.1 kHz</span>
+        </div>
+        <canvas id="waveform" height="140"></canvas>
+      </section>
+
+      <!-- Engine / gauge -->
+      <section class="panel gauge-panel">
+        <div class="panel-header">
+          <h2>Inference Matrix Engine</h2>
+          <span class="panel-tag status-live">LIVE</span>
+        </div>
+        <svg id="gauge" viewBox="0 0 200 200">
+          <circle cx="100" cy="100" r="85" class="gauge-bg" />
+          <circle cx="100" cy="100" r="85" class="gauge-fill" id="gauge-fill" />
+        </svg>
+        <div class="gauge-value" id="gauge-value">0%</div>
+        <div class="gauge-caption">CONFIDENCE</div>
+      </section>
+
+      <!-- Sound class grid -->
+      <section class="panel grid-panel">
+        <div class="panel-header">
+          <h2>Classification Registry Constellation</h2>
+          <span class="panel-tag">Dynamic Node Glow Map</span>
+        </div>
+        <div id="class-grid" class="class-grid"></div>
+      </section>
+
+      <!-- Detection feed -->
+      <section class="panel feed-panel">
+        <div class="panel-header">
+          <h2>Real-Time Intercept Feed</h2>
+        </div>
+        <div id="feed-list" class="feed-list"></div>
+      </section>
+
+      <!-- Timeline / history -->
+      <section class="panel timeline-panel">
+        <div class="panel-header">
+          <h2>Historical Vitals Strip Log</h2>
+        </div>
+        <div id="timeline" class="timeline"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
