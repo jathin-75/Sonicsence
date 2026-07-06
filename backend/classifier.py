@@ -3,7 +3,7 @@ import librosa
 import csv
 import os
 import urllib.request
-import tflite_runtime.interpreter as tflite
+from ai_edge_litert.interpreter import Interpreter
 
 MODEL_PATH = "/tmp/yamnet.tflite"
 CLASS_MAP_PATH = "/tmp/yamnet_class_map.csv"
@@ -23,8 +23,7 @@ print("Loading lightweight YAMNet (TFLite)...")
 ensure_downloaded(MODEL_URL, MODEL_PATH)
 ensure_downloaded(CLASS_MAP_URL, CLASS_MAP_PATH)
 
-INTERPRETER = tflite.Interpreter(model_path=MODEL_PATH)
-INTERPRETER.allocate_tensors()
+INTERPRETER = Interpreter(model_path=MODEL_PATH)
 INPUT_DETAILS = INTERPRETER.get_input_details()
 OUTPUT_DETAILS = INTERPRETER.get_output_details()
 FRAME_SIZE = INPUT_DETAILS[0]["shape"][0]  # 15600 samples (~0.975s at 16kHz)
