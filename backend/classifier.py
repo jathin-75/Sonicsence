@@ -26,8 +26,11 @@ ensure_downloaded(CLASS_MAP_URL, CLASS_MAP_PATH)
 INTERPRETER = Interpreter(model_path=MODEL_PATH)
 INPUT_DETAILS = INTERPRETER.get_input_details()
 OUTPUT_DETAILS = INTERPRETER.get_output_details()
-FRAME_SIZE = INPUT_DETAILS[0]["shape"][0]  # 15600 samples (~0.975s at 16kHz)
+FRAME_SIZE = 15600  # YAMNet expects ~0.975s frames at 16kHz
 
+# YAMNet's TFLite input has a dynamic shape — must resize explicitly before allocating
+INTERPRETER.resize_tensor_input(INPUT_DETAILS[0]["index"], [FRAME_SIZE])
+INTERPRETER.allocate_tensors()
 print("YAMNet (TFLite) loaded successfully.")
 
 
