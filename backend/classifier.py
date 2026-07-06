@@ -1,18 +1,40 @@
 import numpy as np
-import tensorflow as tf
-import tensorflow_hub as hub
 import librosa
 import csv
+import os
+import urllib.request
+import tflite_runtime.interpreter as tflite
 
-print("Loading YAMNet model... (first run may take a minute)")
-YAMNET_MODEL = hub.load("https://tfhub.dev/google/yamnet/1")
-print("YAMNet loaded successfully.")
+MODEL_PATH = "/tmp/yamnet.tflite"
+CLASS_MAP_PATH = "/tmp/yamnet_class_map.csv"
+
+MODEL_URL = "https://tfhub.dev/google/lite-model/yamnet/tflite/1?lite-format=tflite"
+CLASS_MAP_URL = "https://raw.githubusercontent.com/tensorflow/models/master/research/audioset/yamnet/yamnet_class_map.csv"
+
+
+def ensure_downloaded(url: str, path: str):
+    if not os.path.exists(path):
+        print(f"Downloading {path}...")
+        urllib.request.urlretrieve(url, path)
+        print(f"Downloaded {path}")
+
+
+print("Loading lightweight YAMNet (TFLite)...")
+ensure_downloaded(MODEL_URL, MODEL_PATH)
+ensure_downloaded(CLASS_MAP_URL, CLASS_MAP_PATH)
+
+INTERPRETER = tflite.Interpreter(model_path=MODEL_PATH)
+INTERPRETER.allocate_tensors()
+INPUT_DETAILS = INTERPRETER.get_input_details()
+OUTPUT_DETAILS = INTERPRETER.get_output_details()
+FRAME_SIZE = INPUT_DETAILS[0]["shape"][0]  # 15600 samples (~0.975s at 16kHz)
+
+print("YAMNet (TFLite) loaded successfully.")
 
 
 def load_class_names():
-    class_map_path = YAMNET_MODEL.class_map_path().numpy().decode("utf-8")
     class_names = []
-    with tf.io.gfile.GFile(class_map_path) as f:
+    with open(CLASS_MAP_PATH) as f:
         reader = csv.reader(f)
         next(reader)
         for row in reader:
@@ -21,8 +43,6 @@ def load_class_names():
 
 CLASS_NAMES = load_class_names()
 
-# ---------- Map YAMNet's raw labels to specific, human-friendly names ----------
-# Each entry: list of raw YAMNet labels -> one clean display name.
 LABEL_GROUPS = {
     "Dog Bark": ["Bark", "Bow-wow", "Dog", "Howl", "Growling", "Yip"],
     "Baby Crying": ["Baby cry, infant cry", "Crying, sobbing", "Whimper"],
@@ -57,17 +77,10 @@ LABEL_GROUPS = {
     "Human Speech (background)": ["Babble", "Chatter"],
 }
 
-# Build a reverse lookup: raw YAMNet label -> clean display name
 RAW_TO_CLEAN = {}
 for clean_name, raw_labels in LABEL_GROUPS.items():
     for raw in raw_labels:
         RAW_TO_CLEAN[raw.lower()] = clean_name
-
-
-def clean_label(raw_label: str) -> str:
-    """Converts a raw YAMNet label into a specific, friendly display name if we have a mapping."""
-    return RAW_TO_CLEAN.get(raw_label.lower(), raw_label)
-
 
 CRITICAL_KEYWORDS = [
     "gunshot", "gunfire", "explosion", "fire alarm", "smoke detector",
@@ -76,8 +89,7 @@ CRITICAL_KEYWORDS = [
 
 
 def is_critical(label: str) -> bool:
-    label_lower = label.lower()
-    return any(keyword in label_lower for keyword in CRITICAL_KEYWORDS)
+    return any(k in label.lower() for k in CRITICAL_KEYWORDS)
 
 
 def load_audio_16k_mono(file_path: str) -> np.ndarray:
@@ -85,25 +97,41 @@ def load_audio_16k_mono(file_path: str) -> np.ndarray:
     return waveform.astype(np.float32)
 
 
+def run_yamnet_tflite(waveform: np.ndarray) -> np.ndarray:
+    """
+    Runs the TFLite YAMNet model over the waveform in fixed-size frames
+    and returns averaged class scores.
+    """
+    num_frames = max(1, len(waveform) // FRAME_SIZE)
+    all_scores = []
+
+    for i in range(num_frames):
+        start = i * FRAME_SIZE
+        frame = waveform[start:start + FRAME_SIZE]
+        if len(frame) < FRAME_SIZE:
+            frame = np.pad(frame, (0, FRAME_SIZE - len(frame)))
+
+        INTERPRETER.set_tensor(INPUT_DETAILS[0]["index"], frame)
+        INTERPRETER.invoke()
+        scores = INTERPRETER.get_tensor(OUTPUT_DETAILS[0]["index"])
+        all_scores.append(scores[0])
+
+    return np.mean(all_scores, axis=0)
+
+
 def classify_audio(filename: str = None, file_path: str = None) -> list[dict]:
     if file_path is None:
         raise ValueError("file_path is required for real classification")
 
     waveform = load_audio_16k_mono(file_path)
-    scores, embeddings, spectrogram = YAMNET_MODEL(waveform)
-    scores_np = scores.numpy()
-    mean_scores = scores_np.mean(axis=0)
+    mean_scores = run_yamnet_tflite(waveform)
 
-    # Look through the top 30 raw predictions to find ones we have a specific mapping for
     top_indices = np.argsort(mean_scores)[::-1][:30]
 
     seen_labels = set()
     results = []
     for idx in top_indices:
         raw_label = CLASS_NAMES[idx]
-
-        # Only accept labels we have an explicit, specific mapping for.
-        # This filters out vague parent categories like "Animal" or "Domestic animals, pets".
         if raw_label.lower() not in RAW_TO_CLEAN:
             continue
 
@@ -120,7 +148,6 @@ def classify_audio(filename: str = None, file_path: str = None) -> list[dict]:
             "critical": is_critical(display_label),
         })
 
-    # Keep only confident, specific detections
     filtered = [r for r in results if r["confidence"] >= 8.0]
     if not filtered and results:
         filtered = [results[0]]
